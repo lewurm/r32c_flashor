@@ -1,18 +1,11 @@
 #!/usr/bin/env python
-"""
-This file realize a simple programmer, which communicates with our "pkernel"
-firmware.
-"""
 import sys, time
 from SerialPort_linux import SerialPort, SerialPortException
 
 # baudrate used for initialization
 INIT_BAUDRATE = 9600
 # baudrate used for communication with the internal bootloader after init
-BOOTLOADER_BAUDRATE = 38400
-# baudrate used for communication with the pkernel program that does the
-# flashing eventually
-KERNEL_BAUDRATE = 115200
+BOOTLOADER_BAUDRATE = 9600
 # constant for output
 SPLIT = 30
 
@@ -244,7 +237,9 @@ def main(argv=None):
 		print "Version: %VERSION%"
 		return 0
 
-	if len(argv) != 2 and len(argv) != 4:
+	#TODO: ...
+	#if len(argv) != 2 and len(argv) != 4:
+	if len(argv) != 1:
 		usage(argv[0])
 		return 1
 
@@ -260,98 +255,36 @@ def main(argv=None):
 			return 1
 
 	# read in data from mhx-files before starting
-	try:
-		try:
-			bootloaderseqs = readmhxfile("pkernel/pkernel.mhx")
-		except IOError as _:
-			bootloaderseqs = readmhxfile("%PREFIX%/share/frprog/pkernel.mhx")
-		pkernelseqs = readmhxfile(argv[1])
-	except IOError as error:
-		print argv[0] + ": Error - couldn't open file " + error.filename + "!"
-		return 1
+	#try:
+		#try:
+			#bootloaderseqs = readmhxfile("pkernel/pkernel.mhx")
+		#except IOError as _:
+			#bootloaderseqs = readmhxfile("%PREFIX%/share/frprog/pkernel.mhx")
+		#pkernelseqs = readmhxfile(argv[1])
+	#except IOError as error:
+		#print argv[0] + ": Error - couldn't open file " + error.filename + "!"
+		#return 1
 
 	print "Initializing serial port..."
 	global tty
 	tty = SerialPort(device, 100, INIT_BAUDRATE)
 
-	print "Please press RESET on your board..."
+	print "Please push the RESET button on your board and press any key to continue..."
+	#TODO: wait for user input
 
-	while True:
-		tty.write('V')
-		tty.flush()
-		try:
-			if tty.read() == 'F':
-				break
-		except SerialPortException:
-			# timeout happened, who cares ;-)
-			pass
+	time.sleep(0.003)
+
+
+	for i in range(16):
+		sendbyte(0x00)
+		time.sleep(0.021) #wait 21ms
+	
+	sendbyte(0xb0) # set 9600 baud
+	print "status byte after baudset: ", recvbyte()
+
 
 	# save time at this point for evaluating the duration at the end
 	starttime = time.time()
-
-	print "OK, trying to set baudrate..."
-	# set baudrate
-	try:
-		bootrombaudrate(BOOTLOADER_BAUDRATE)
-	except SerialPortException:
-		print "timeout exception: try again ->"
-		bootrombaudrate(BOOTLOADER_BAUDRATE)
-	# just to get sure that the bootloader is really running in new baudrate mode!
-	time.sleep(0.1)
-	del tty
-	tty = SerialPort(device, 100, BOOTLOADER_BAUDRATE)
-
-	sdots = SPLIT
-	print "Transfering pkernel program to IRAM",
-	# let the fun begin!
-	for seq in bootloaderseqs:
-		if(seq.address <= 0x40000):
-			addr = seq.address
-		else:
-			continue
-		#print "RAMing", len(seq.data), "bytes at address", hex(addr)
-		bootromwrite(addr, len(seq.data), seq.data)
-		tty.flush()
-
-		sdots = sdots - 1
-		if sdots == 0:
-			sys.stdout.write(".")
-			sys.stdout.flush()
-			sdots = SPLIT
-	print
-
-	# execute our pkernel finally and set pkernel conform baudrate
-	bootromcall(0x30000)
-	time.sleep(0.1) # just to get sure that the pkernel is really running!
-	del tty
-	tty = SerialPort(device, None, KERNEL_BAUDRATE)
-
-	print "Performing ChipErase..."
-	pkernchiperase()
-
-	sdots = SPLIT
-	print "Flashing",
-	for seq in pkernelseqs:
-		# skip seqs only consisting of 0xffs
-		seqset = list(set(seq.data))
-		if len(seqset) == 1 and seqset[0] == 0xff:
-			continue
-		#print "Flashing", len(seq.data), "bytes at address", hex(seq.address)
-		pkernwrite(seq.address, len(seq.data), seq.data)
-		tty.flush()
-
-		sdots = sdots - 1
-		if sdots == 0:
-			sys.stdout.write(".")
-			sys.stdout.flush()
-			sdots = SPLIT
-	print
-
-	duration = time.time() - starttime
-	print "Procedure complete, took", round(duration, 2), "seconds."
-
-	sendbyte(0x97) # exit and restart
-	print "Program was started. Have fun!"
 
 
 if __name__ == '__main__':
