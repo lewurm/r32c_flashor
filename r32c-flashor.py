@@ -17,6 +17,10 @@ class FlashSequence(object):
 		self.address = address
 		self.data = data
 
+def dec2hex(n):
+	"""return the hexadecimal string representation of integer n"""
+	return "%X" % n
+
 def sendbyte(byte):
 	"""
 	send a byte to the TTY-device
@@ -219,6 +223,21 @@ def readmhxfile(filename): # desired mhx filename
 	filep.close()
 	return retval
 
+def clearStatus():
+	sendbyte(0x50);
+
+def getStatus():
+	sendbyte(0x70) # get status
+	status1 = recvbyte()
+	status2 = recvbyte()
+	print "status1: " + dec2hex(status1)
+	print "status2: " + dec2hex(status2)
+
+def testBit(byte, pos):
+	bitmask = 1 << pos
+	return (byte & bitmask)
+
+
 def usage(execf):
 	"""
 	print usage of frprog
@@ -267,9 +286,14 @@ def main(argv=None):
 
 	print "Initializing serial port..."
 	global tty
-	tty = SerialPort(device, 100, INIT_BAUDRATE)
+	try:
+		tty = SerialPort(device, 100, INIT_BAUDRATE)
+	except SerialPortException as error:
+		print error + " Device: " + device + "!"
+		return 1
 
-	print "Please push the RESET button on your board and press any key to continue..."
+
+	raw_input("Please push the RESET button on your board and press any ENTER to continue...")
 	#TODO: wait for user input
 
 	time.sleep(0.003)
@@ -290,6 +314,7 @@ def main(argv=None):
 
 	print "chipversion: ", version
 
+	getStatus()
 
 	# save time at this point for evaluating the duration at the end
 	starttime = time.time()
