@@ -282,6 +282,14 @@ def main(argv=None):
 	sendbyte(0xb0) # set 9600 baud
 	print "status byte after baudset: ", recvbyte()
 
+	sendbyte(0xfb) # get version
+
+	version = ""
+	for i in range(8):
+		version = version + chr(recvbyte())
+
+	print "chipversion: ", version
+
 
 	# save time at this point for evaluating the duration at the end
 	starttime = time.time()
