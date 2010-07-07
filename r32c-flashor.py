@@ -232,10 +232,23 @@ def getStatus():
 	status2 = recvbyte()
 	print "status1: " + dec2hex(status1)
 	print "status2: " + dec2hex(status2)
+	print "bootloader ready: " + str(testBit(status1, 7))
+	key1 = testBit(status2, 2)
+	key2 = testBit(status2, 3)
+
+	if key1 == 1 and key2 == 1:
+		print "correct key"
+	elif key1 == 1 and key2 == 0:
+		print "wrong key"
+	elif key1 == 0 and key2 == 0:
+		print "no key"
+	else:
+		print "w00t"
+	
 
 def testBit(byte, pos):
 	bitmask = 1 << pos
-	return (byte & bitmask)
+	return (byte & bitmask) >> pos
 
 
 def usage(execf):
