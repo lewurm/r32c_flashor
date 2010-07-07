@@ -250,6 +250,21 @@ def testBit(byte, pos):
 	bitmask = 1 << pos
 	return (byte & bitmask) >> pos
 
+def sendAddr(addr):
+	sendbyte(0x48)
+	sendbyte((addr >> 24) & 0xFF)
+	sendbyte(0xF5)
+	sendbyte(addr& 0xFF)
+	sendbyte((addr >> 8) & 0xFF)
+	sendbyte((addr >> 16) & 0xFF)
+
+def sendKey(addr, key):
+	print "Sending key: " + dec2hex(key) + " for addr: " + dec2hex(addr)
+	sendAddr(addr)
+	sendbyte(0x07)
+	for i in range(7):
+		sendbyte((key >> i) & 0xFF)
+
 
 def usage(execf):
 	"""
@@ -327,7 +342,18 @@ def main(argv=None):
 
 	print "chipversion: ", version
 
-	getStatus()
+	clearStatus()
+
+	for i in range(0xFFFFFFE8, 0xFFFFFFEE):
+
+		sendKey(i, 0x00000000000000)
+		getStatus()
+		clearStatus()
+
+
+		sendKey(i, 0xFFFFFFFFFFFFFF)
+		getStatus()
+		clearStatus()
 
 	# save time at this point for evaluating the duration at the end
 	starttime = time.time()
