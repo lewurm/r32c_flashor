@@ -17,6 +17,19 @@ class FlashSequence(object):
 		self.address = address
 		self.data = data
 
+class MCUStatus(object):
+	NOKEY=0
+	WRONGKEY=1
+	CORRECTKEY=2
+	key = 0
+
+	def setKeyStatus(self, key):
+		self.key = key
+
+	def getKeyStatus(self):
+		return self.key
+
+
 def dec2hex(n):
 	"""return the hexadecimal string representation of integer n"""
 	return "%X" % n
@@ -236,14 +249,22 @@ def getStatus():
 	key1 = testBit(status2, 2)
 	key2 = testBit(status2, 3)
 
+	status = MCUStatus()
+
 	if key1 == 1 and key2 == 1:
+		status.setKeyStatus(MCUStatus.CORRECTKEY)
 		print "correct key"
 	elif key1 == 1 and key2 == 0:
+		status.setKeyStatus(MCUStatus.WRONGKEY)
 		print "wrong key"
 	elif key1 == 0 and key2 == 0:
+		status.setKeyStatus(MCUStatus.NOKEY)
 		print "no key"
 	else:
 		print "w00t"
+		raise Exception('wrongkeybits!')
+
+	return status
 	
 
 def testBit(byte, pos):
@@ -344,16 +365,30 @@ def main(argv=None):
 
 	clearStatus()
 
-	for i in range(0xFFFFFFE8, 0xFFFFFFEE):
+	correct = 0
+	if getStatus().getKeyStatus() == MCUStatus.CORRECTKEY:
+		correct = 1
+	else:
+		for i in range(0xFFFFFFE8, 0xFFFFFFEE):
 
-		sendKey(i, 0x00000000000000)
-		getStatus()
-		clearStatus()
+			sendKey(i, 0x00000000000000)
+			status = getStatus()
+			if status.getKeyStatus() == MCUStatus.CORRECTKEY:
+				correct = 1
+				break
+			clearStatus()
 
 
-		sendKey(i, 0xFFFFFFFFFFFFFF)
-		getStatus()
-		clearStatus()
+			sendKey(i, 0xFFFFFFFFFFFFFF)
+			status = getStatus()
+			if status.getKeyStatus() == MCUStatus.CORRECTKEY:
+				correct = 1
+				break
+			clearStatus()
+
+	if correct == 0:
+		print "No Valid Key found! Powercycle the board or provide correct key!"
+		return 1
 
 	# save time at this point for evaluating the duration at the end
 	starttime = time.time()
