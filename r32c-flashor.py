@@ -271,7 +271,7 @@ def testBit(byte, pos):
 	bitmask = 1 << pos
 	return (byte & bitmask) >> pos
 
-def sendAddr(addr):
+def sendKeyAddr(addr):
 	sendbyte(0x48)
 	sendbyte((addr >> 24) & 0xFF)
 	sendbyte(0xF5)
@@ -279,12 +279,25 @@ def sendAddr(addr):
 	sendbyte((addr >> 8) & 0xFF)
 	sendbyte((addr >> 16) & 0xFF)
 
+def sendPageAddr(addr, cmd):
+	sendbyte(0x48)
+	sendbyte((addr >> 24) & 0xFF)
+	sendbyte(cmd)
+	sendbyte((addr >> 8) & 0xFF)
+	sendbyte((addr >> 16) & 0xFF)
+
+
 def sendKey(addr, key):
 	print "Sending key: " + dec2hex(key) + " for addr: " + dec2hex(addr)
-	sendAddr(addr)
+	sendKeyAddr(addr)
 	sendbyte(0x07)
 	for i in range(7):
 		sendbyte((key >> i) & 0xFF)
+
+def readPage(addr)
+	sendPageAddr(addr, 0xff)
+	for i in range(0, 255):
+		print "byte" + str(i) + ": " + dec2hex(recvbyte())
 
 
 def usage(execf):
@@ -389,6 +402,9 @@ def main(argv=None):
 	if correct == 0:
 		print "No Valid Key found! Powercycle the board or provide correct key!"
 		return 1
+
+	readPage(0xffff0000)
+
 
 	# save time at this point for evaluating the duration at the end
 	starttime = time.time()
