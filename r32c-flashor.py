@@ -335,16 +335,52 @@ def main(argv=None):
 			return 1
 
 	# read in data from mhx-files before starting
-	#try:
-		#try:
-			#bootloaderseqs = readmhxfile("pkernel/pkernel.mhx")
-		#except IOError as _:
-			#bootloaderseqs = readmhxfile("%PREFIX%/share/frprog/pkernel.mhx")
-		#pkernelseqs = readmhxfile(argv[1])
-	#except IOError as error:
-		#print argv[0] + ": Error - couldn't open file " + error.filename + "!"
-		#return 1
+	try:
+		prgseqs = readmhxfile(argv[1])
+	except IOError as error:
+		print argv[0] + ": Error - couldn't open file " + error.filename + "!"
+		return 1
+	lastPos = 255	
+	lastAddr = -256
+	page = []
+	print len(prgseqs)
+	for i in range(0,len(prgseqs)):
+		addr = prgseqs[i].address
+		mod = addr%256
+		if mod < lastPos or (addr-lastAddr) >= 256:
+			print "new page! old has " + str(len(page)) + " bytes"
+			if len(page) < 256:
+				for j in range(len(page), 256):
+					page.append(0)
+			newpage = []
+			if len(page) > 255:
+				for j in range(256, len(page)):
+					newpage.append(page[256])
+					del page[256]
+			if lastAddr >= 0:
+				#print page
+				for byte in page:
+					print dec2hex(byte),
+				print 
+			page = newpage
 
+		if len(page) != mod:
+			print "need filling"
+			for j in range(0,len(page)-mod):
+				page.append(0)
+		lastPos = mod 
+		lastAddr = addr
+
+		data = prgseqs[i].data
+
+		for j in range(0,len(data)):
+			page.append(data[j])
+
+		#print prgseqs[i].data
+		print str(mod) + "< mod size > " + str(len(data))
+
+
+	
 	print "Initializing serial port..."
 	global tty
 	try:
