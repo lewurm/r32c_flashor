@@ -210,10 +210,9 @@ def readmhxfile(filename): # desired mhx filename
 		linecount += 1
 		# get rid of newline characters
 		line = line.strip()
-
 		# we're only interested in S2 (data sequence with 3 address bytes)
 		# records by now
-		if line[0:2] == "S2":
+		if line[0:2] == "S3":
 			byte_count = int(line[2:4], 16)
 			# just to get sure, check if byte count field is valid
 			if (len(line)-4) != (byte_count*2):
@@ -222,10 +221,10 @@ def readmhxfile(filename): # desired mhx filename
 				continue
 
 			# address and checksum bytes are not needed
-			byte_count -= 4
-			address = int(line[4:10], 16)
-			datastr = line[10:10+byte_count*2]
-
+			byte_count -= 5
+			address = int(line[4:12], 16)
+			print line[4:12] + "< hex  dec > " +str(address)
+			datastr = line[12:12+byte_count*2]
 			# convert data hex-byte-string to real byte data list
 			data = []
 			for i in range(0, len(datastr)/2):
@@ -320,7 +319,7 @@ def main(argv=None):
 
 	#TODO: ...
 	#if len(argv) != 2 and len(argv) != 4:
-	if len(argv) != 1:
+	if len(argv) != 2:
 		usage(argv[0])
 		return 1
 
@@ -354,12 +353,9 @@ def main(argv=None):
 		print error + " Device: " + device + "!"
 		return 1
 
-
+	
 	raw_input("Please push the RESET button on your board and press any ENTER to continue...")
 	#TODO: wait for user input
-
-	time.sleep(0.003)
-
 
 	for i in range(16):
 		sendbyte(0x00)
