@@ -294,7 +294,7 @@ def sendKey(addr, key):
 	for i in range(7):
 		sendbyte((key >> i) & 0xFF)
 
-def readPage(addr)
+def readPage(addr):
 	sendPageAddr(addr, 0xff)
 	for i in range(0, 255):
 		print "byte" + str(i) + ": " + dec2hex(recvbyte())
