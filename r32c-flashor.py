@@ -12,6 +12,9 @@ SPLIT = 30
 # contains the last received checksum from a READ, WRITE or CHECKSUM command
 lastchecksum = 0
 
+flashKey = -1
+flashKeyAddr = -1
+
 class FlashSequence(object):
 	def __init__(self, address, data):
 		self.address = address
@@ -238,13 +241,15 @@ def readmhxfile(filename): # desired mhx filename
 def clearStatus():
 	sendbyte(0x50);
 
-def getStatus():
+def getStatusKey(sendKey):
 	sendbyte(0x70) # get status
 	status1 = recvbyte()
 	status2 = recvbyte()
 	print "status1: " + dec2hex(status1)
 	print "status2: " + dec2hex(status2)
 	print "bootloader ready: " + str(testBit(status1, 7))
+	print "erase fail: " + str(testBit(status1, 5))
+	print "programming fail: " + str(testBit(status1, 4))
 	key1 = testBit(status2, 2)
 	key2 = testBit(status2, 3)
 
@@ -258,13 +263,20 @@ def getStatus():
 		print "wrong key"
 	elif key1 == 0 and key2 == 0:
 		status.setKeyStatus(MCUStatus.NOKEY)
-		print "no key"
+		print "no key",
+		if sendKey == 1:
+			sendFlashKey()
+			print " - sending key"
+		else:
+			print
 	else:
 		print "w00t"
 		raise Exception('wrongkeybits!')
 
 	return status
-	
+
+def getStatus():
+	return getStatusKey(0)
 
 def testBit(byte, pos):
 	bitmask = 1 << pos
@@ -296,7 +308,101 @@ def sendKey(addr, key):
 def readPage(addr):
 	sendPageAddr(addr, 0xff)
 	for i in range(0, 255):
-		print "byte" + str(i) + ": " + dec2hex(recvbyte())
+		#print "byte" + str(i) + ": " + dec2hex(recvbyte())
+		print dec2hex(recvbyte()),
+
+def writePage(addr, data):
+	clearStatus()
+	getStatus()
+	sendPageAddr(addr, 0x41)
+	for byte in data:
+		sendbyte(byte)
+	print "Data written"
+	time.sleep(0.5) #wait 500ms
+	getStatus()
+
+def writeProg(prgseqs):
+	lastPos = 255	
+	lastAddr = -256
+	pageAddr = 0
+	page = []
+
+	for i in range(0,len(prgseqs)):
+		addr = prgseqs[i].address
+		mod = addr%256
+		if mod < lastPos or (addr-lastAddr) >= 256:
+			#print "new page! old has " + str(len(page)) + " bytes"
+			if len(page) < 256:
+				for j in range(len(page), 256):
+					page.append(0)
+			newpage = []
+			if len(page) > 255:
+				for j in range(256, len(page)):
+					newpage.append(page[256])
+					del page[256]
+			if lastAddr >= 0:
+				#print page
+				#for byte in page:
+					#print dec2hex(byte),
+				print "Programming to addr " + dec2hex(pageAddr)
+				writePage(pageAddr, page)
+
+			page = newpage
+			pageAddr = addr - mod
+
+		if len(page) != mod:
+			#print "need filling"
+			for j in range(0,len(page)-mod):
+				page.append(0)
+		lastPos = mod 
+		lastAddr = addr
+
+		data = prgseqs[i].data
+
+		for j in range(0,len(data)):
+			page.append(data[j])
+
+		#print prgseqs[i].data
+		#print str(mod) + "< mod size > " + str(len(data))
+
+def sendFlashKey():
+	correct = 0
+	global flashKey
+	global flashKeyAddr
+	if getStatus().getKeyStatus() == MCUStatus.CORRECTKEY:
+		correct = 1
+	else:
+		if flashKey != -1:
+			sendKey(flashKeyAddr, flashKey)
+			status = getStatus()
+			if status.getKeyStatus() != MCUStatus.CORRECTKEY:
+				print "w00t, key changed?!?"
+			clearStatus()
+
+		else:
+			for i in range(0xFFFFFFE8, 0xFFFFFFEE):
+
+				sendKey(i, 0x00000000000000)
+				status = getStatus()
+				if status.getKeyStatus() == MCUStatus.CORRECTKEY:
+					flashKey = 0x00000000000000
+					flashKeyAddr = i
+					correct = 1
+					break
+				clearStatus()
+
+
+				sendKey(i, 0xFFFFFFFFFFFFFF)
+				status = getStatus()
+				if status.getKeyStatus() == MCUStatus.CORRECTKEY:
+					flashKey = 0xFFFFFFFFFFFFFF
+					flashKeyAddr = i
+					correct = 1
+					break
+				clearStatus()
+
+	return correct
+
 
 
 def usage(execf):
@@ -340,47 +446,7 @@ def main(argv=None):
 	except IOError as error:
 		print argv[0] + ": Error - couldn't open file " + error.filename + "!"
 		return 1
-	lastPos = 255	
-	lastAddr = -256
-	page = []
-	print len(prgseqs)
-	for i in range(0,len(prgseqs)):
-		addr = prgseqs[i].address
-		mod = addr%256
-		if mod < lastPos or (addr-lastAddr) >= 256:
-			print "new page! old has " + str(len(page)) + " bytes"
-			if len(page) < 256:
-				for j in range(len(page), 256):
-					page.append(0)
-			newpage = []
-			if len(page) > 255:
-				for j in range(256, len(page)):
-					newpage.append(page[256])
-					del page[256]
-			if lastAddr >= 0:
-				#print page
-				for byte in page:
-					print dec2hex(byte),
-				print 
-			page = newpage
 
-		if len(page) != mod:
-			print "need filling"
-			for j in range(0,len(page)-mod):
-				page.append(0)
-		lastPos = mod 
-		lastAddr = addr
-
-		data = prgseqs[i].data
-
-		for j in range(0,len(data)):
-			page.append(data[j])
-
-		#print prgseqs[i].data
-		print str(mod) + "< mod size > " + str(len(data))
-
-
-	
 	print "Initializing serial port..."
 	global tty
 	try:
@@ -410,33 +476,17 @@ def main(argv=None):
 
 	clearStatus()
 
-	correct = 0
-	if getStatus().getKeyStatus() == MCUStatus.CORRECTKEY:
-		correct = 1
-	else:
-		for i in range(0xFFFFFFE8, 0xFFFFFFEE):
-
-			sendKey(i, 0x00000000000000)
-			status = getStatus()
-			if status.getKeyStatus() == MCUStatus.CORRECTKEY:
-				correct = 1
-				break
-			clearStatus()
-
-
-			sendKey(i, 0xFFFFFFFFFFFFFF)
-			status = getStatus()
-			if status.getKeyStatus() == MCUStatus.CORRECTKEY:
-				correct = 1
-				break
-			clearStatus()
-
-	if correct == 0:
+	if sendFlashKey() == 0:
 		print "No Valid Key found! Powercycle the board or provide correct key!"
 		return 1
 
+	#readPage(0xffff0000)
+	clearStatus()
+	writeProg(prgseqs)
+	time.sleep(0.5) #wait 500ms
+	getStatus()
 	readPage(0xffff0000)
-
+	
 
 	# save time at this point for evaluating the duration at the end
 	starttime = time.time()
