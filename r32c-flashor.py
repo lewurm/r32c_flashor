@@ -270,8 +270,10 @@ def getStatusKey(sendKey):
 		else:
 			print
 	else:
+
+		status.setKeyStatus(MCUStatus.CORRECTKEY)
 		print "w00t"
-		raise Exception('wrongkeybits!')
+		#raise Exception('wrongkeybits!')
 
 	return status
 
@@ -318,7 +320,7 @@ def writePage(addr, data):
 	for byte in data:
 		sendbyte(byte)
 	print "Data written"
-	time.sleep(0.5) #wait 500ms
+	time.sleep(1) #wait 1s
 	getStatus()
 
 def writeProg(prgseqs):
@@ -404,6 +406,15 @@ def sendFlashKey():
 	return correct
 
 
+def eraseAll():
+	clearStatus()
+	sendbyte(0xa7)
+	sendbyte(0xd0)
+	print "issued eraseAll"
+	#loop with greater timeout and status checking
+	time.sleep(16) # 16 sec waiting, too lazy to write loop ^^
+	getStatus()
+
 
 def usage(execf):
 	"""
@@ -481,10 +492,14 @@ def main(argv=None):
 		return 1
 
 	#readPage(0xffff0000)
+	
 	clearStatus()
 	writeProg(prgseqs)
 	time.sleep(0.5) #wait 500ms
 	getStatus()
+	
+	#eraseAll()
+
 	readPage(0xffff0000)
 	
 
